@@ -3,11 +3,13 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToOne,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+import { LocalUser } from '../../food-listing/entities/local-user.entity.js';
+import { Claim } from '../../claims/entities/claim.entity.js';
 
 @Entity('reviews')
 export class Review {
@@ -15,18 +17,25 @@ export class Review {
   id: number;
 
   @Column()
-  receiverId: number;
+  claimId: number;
 
-  @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })
+  @OneToOne(() => Claim, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'claimId' })
+  claim: Claim;
+
+  @Column({ type: 'varchar', length: 10 })
+  receiverId: string;
+
+  @ManyToOne(() => LocalUser, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'receiverId' })
-  receiver: User;
+  receiver: LocalUser;
 
-  @Column()
-  donorId: number;
+  @Column({ type: 'varchar', length: 10 })
+  donorId: string;
 
-  @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })
+  @ManyToOne(() => LocalUser, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'donorId' })
-  donor: User;
+  donor: LocalUser;
 
   @Column({ type: 'int' })
   rating: number;

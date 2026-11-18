@@ -7,12 +7,13 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto.js';
 
-import { Delivery } from './entities/delivery.entity';
-import { DeliveryStatus } from './entities/delivery-status.enum';
-import { CreateDeliveryDto } from './dto/create-delivery.dto';
-import { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto';
-import { Claim } from '../claims/entities/claim.entity';
+import { Delivery } from './entities/delivery.entity.js';
+import { DeliveryStatus } from './entities/delivery-status.enum.js';
+import { CreateDeliveryDto } from './dto/create-delivery.dto.js';
+import { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto.js';
+import { Claim } from '../claims/entities/claim.entity.js';
 
 @Injectable()
 export class DeliveriesService {
@@ -48,17 +49,38 @@ export class DeliveriesService {
       status: DeliveryStatus.OPEN,
     });
 
-    return await this.deliveryRepository.save(delivery);
+    try {
+      return await this.deliveryRepository.save(delivery);
+    } catch (error) {
+      if (
+        (error as { driverError?: { code?: string } })?.driverError?.code ===
+        '23505'
+      ) {
+        throw new ConflictException('Delivery already exists for this claim');
+      }
+      throw error;
+    }
   }
 
-  async findOpenDeliveries(): Promise<Delivery[]> {
-    return await this.deliveryRepository.find({
+  async findOpenDeliveries(query: PaginationQueryDto) {
+    const [items, total] = await this.deliveryRepository.findAndCount({
       where: { status: DeliveryStatus.OPEN },
       order: { createdAt: 'DESC' },
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
     });
+    return {
+      items,
+      meta: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        pages: Math.ceil(total / query.limit),
+      },
+    };
   }
 
-  async acceptDelivery(id: number, volunteerId: number): Promise<Delivery> {
+  async acceptDelivery(id: number, volunteerId: string): Promise<Delivery> {
     const delivery = await this.deliveryRepository.findOne({
       where: { id },
     });
@@ -71,16 +93,23 @@ export class DeliveriesService {
       throw new ConflictException('This delivery is not open for acceptance');
     }
 
-    delivery.volunteerId = volunteerId;
-    delivery.status = DeliveryStatus.ACCEPTED;
-
-    return await this.deliveryRepository.save(delivery);
+    // Atomic conditional update prevents two volunteers accepting the same task.
+    const result = await this.deliveryRepository.update(
+      { id, status: DeliveryStatus.OPEN },
+      { volunteerId, status: DeliveryStatus.ACCEPTED },
+    );
+    if (!result.affected) {
+      throw new ConflictException(
+        'This delivery was accepted by another volunteer',
+      );
+    }
+    return (await this.deliveryRepository.findOne({ where: { id } }))!;
   }
 
   async updateStatus(
     id: number,
     updateDeliveryStatusDto: UpdateDeliveryStatusDto,
-    volunteerId: number,
+    volunteerId: string,
   ): Promise<Delivery> {
     const { status } = updateDeliveryStatusDto;
 
@@ -115,7 +144,9 @@ export class DeliveriesService {
       status === DeliveryStatus.DELIVERED &&
       delivery.status !== DeliveryStatus.PICKED_UP
     ) {
-      throw new ConflictException('Delivery must be picked up before delivered');
+      throw new ConflictException(
+        'Delivery must be picked up before delivered',
+      );
     }
 
     delivery.status = status;

@@ -8,9 +8,9 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Claim } from '../../claims/entities/claim.entity';
-import { User } from '../../users/entities/user.entity';
-import { DeliveryStatus } from './delivery-status.enum';
+import { Claim } from '../../claims/entities/claim.entity.js';
+import { LocalUser } from '../../food-listing/entities/local-user.entity.js';
+import { DeliveryStatus } from './delivery-status.enum.js';
 
 @Entity('deliveries')
 export class Delivery {
@@ -24,12 +24,16 @@ export class Delivery {
   @JoinColumn({ name: 'claimId' })
   claim: Claim;
 
-  @Column({ nullable: true })
-  volunteerId: number;
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  volunteerId: string;
 
-  @ManyToOne(() => User, { nullable: true, eager: true, onDelete: 'SET NULL' })
+  @ManyToOne(() => LocalUser, {
+    nullable: true,
+    eager: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'volunteerId' })
-  volunteer: User;
+  volunteer: LocalUser;
 
   @Column({
     type: 'enum',

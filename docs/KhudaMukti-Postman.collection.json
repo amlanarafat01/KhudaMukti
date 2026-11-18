@@ -1,0 +1,178 @@
+{
+  "info": {
+    "name": "KhudaMukti API (local testing)",
+    "description": "Log in to save a valid JWT automatically, then use it for claims and member 4 API requests. Set the API base URL to the port where the NestJS server is running.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3002" },
+    { "key": "access_token", "value": "" },
+    { "key": "claimId", "value": "" },
+    { "key": "deliveryId", "value": "" },
+    { "key": "reviewId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Login (save JWT automatically)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"YOUR_REGISTERED_EMAIL\",\n  \"password\": \"YOUR_PASSWORD\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && body?.data?.access_token) {",
+                  "  pm.collectionVariables.set('access_token', body.data.access_token);",
+                  "  console.log('JWT saved to this collection.');",
+                  "} else {",
+                  "  console.error('Login did not return data.access_token. Check credentials and response.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Claims",
+      "item": [
+        {
+          "name": "Create claim (Receiver)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"listingId\": 9,\n  \"quantity\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/claims"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const claim = body?.data?.claim ?? body?.data;",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && claim?.id) {",
+                  "  pm.collectionVariables.set('claimId', String(claim.id));",
+                  "  console.log('Claim ID saved:', claim.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Member 4 APIs",
+      "item": [
+        {
+          "name": "List open deliveries",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/deliveries/open?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Create delivery (Admin; uses saved claimId)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"claimId\": {{claimId}}\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/deliveries"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const delivery = body?.data?.delivery ?? body?.data;",
+                  "if (pm.response.code >= 200 && pm.response.code < 300 && delivery?.id) pm.collectionVariables.set('deliveryId', String(delivery.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept delivery (Volunteer; set deliveryId first)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "method": "PATCH",
+            "url": "{{baseUrl}}/deliveries/{{deliveryId}}/accept"
+          }
+        },
+        {
+          "name": "Update delivery status (Volunteer)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"PICKED_UP\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/deliveries/{{deliveryId}}/status"
+          }
+        },
+        {
+          "name": "Delete delivery (Admin; destructive)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "method": "DELETE",
+            "url": "{{baseUrl}}/deliveries/{{deliveryId}}"
+          }
+        },
+        {
+          "name": "List reviews",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/reviews?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Create review (Receiver; set claimId first)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"claimId\": {{claimId}},\n  \"rating\": 5,\n  \"comment\": \"Test review\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/reviews"
+          }
+        },
+        {
+          "name": "List audit logs (Admin)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": "{{baseUrl}}/audit-logs?page=1&limit=20"
+          }
+        }
+      ]
+    }
+  ]
+}

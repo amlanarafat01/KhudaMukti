@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { DeliveriesController } from './deliveries.controller';
-import { DeliveriesService } from './deliveries.service';
-import { Delivery } from './entities/delivery.entity';
-import { Claim } from '../claims/entities/claim.entity';
+import { DeliveriesController } from './deliveries.controller.js';
+import { DeliveriesService } from './deliveries.service.js';
+import { Delivery } from './entities/delivery.entity.js';
+import { Claim } from '../claims/entities/claim.entity.js';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Delivery, Claim])],
