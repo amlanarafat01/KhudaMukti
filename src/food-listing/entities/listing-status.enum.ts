@@ -1,0 +1,1 @@
+export enum ListingStatus { AVAILABLE = 'AVAILABLE', CLAIMED = 'CLAIMED', EXPIRED = 'EXPIRED'}
